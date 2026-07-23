@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulting Resource & Project Planner</title>
+
+    <!-- Import Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
+    <!-- Import html2pdf for intelligent pagination and PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        /* Typography and Global Styles */
+        body {
+            font-family: 'DIN Pro Condensed', 'DIN Condensed', 'Arial Narrow', sans-serif;
+            padding: 30px;
+            max-width: 1200px;
+            margin: auto;
+            background-color: #f4f4f4;
+            color: #111;
+            letter-spacing: 0.5px;
+        }
+
+        /* Top Application Header */
+        .page-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            margin-bottom: 60px;
+            width: 100%;
+        }
+
+        .logo {
+            width: 300px;
+            height: auto;
+            margin-bottom: 10px;
+        }
+
+        .top-right-text {
+            position: absolute;
+            top: 0;
+            right: 0;
+            font-size: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        h2 {
+            text-align: left;
+            margin-top: 0;
+            text-transform: uppercase;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+            font-size: 28px;
+        }
+        p.subtitle {
+            font-size: 18px;
+            color: #555;
+            margin-top: -10px;
+            margin-bottom: 20px;
+        }
+        .panel {
+            background: white;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        /* Inputs & Buttons styling */
+        .controls, .planner-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        input[type="text"], input[type="number"], select {
+            font-family: inherit;
+            font-size: 16px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            flex: 1;
+            min-width: 140px;
+            border-radius: 0;
+        }
+        button, .btn-upload {
+            font-family: inherit;
+            font-size: 16px;
+            text-transform: uppercase;
+            padding: 10px 20px;
+            cursor: pointer;
+            background: #000;
+            color: #fff;
+            border: none;
+            font-weight: bold;
+            transition: background 0.2s;
+            display: inline-block;
+            text-align: center;
+        }
+        button:hover { background: #444; }
+        .btn-upload { background: #555; }
+        .btn-upload:hover { background: #333; }
+        .btn-import { background: #0044cc; } /* Distinguish the CSV import button */
+        .btn-import:hover { background: #003399; }
+        .btn-clear { background: #888; }
+        .btn-clear:hover { background: #666; }
+        .btn-delete {
+            background: #fff;
+            color: #000;
+            border: 1px solid #000;
+            padding: 5px 10px;
+            font-size: 14px;
+        }
+        .btn-delete:hover { background: #000; color: #fff; }
+        .btn-download {
+            width: 100%;
+            margin-top: 20px;
+            font-size: 18px;
+            padding: 15px;
+        }
+
+        /* Chart Areas */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 450px;
+            margin: 20px auto;
+            background: white;
+        }
+        .slice-list {
+            margin: 0 0 20px 0;
+            padding: 0;
+            list-style: none;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .slice-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f9f9f9;
+            padding: 10px 15px;
+            border-left: 6px solid #000;
+        }
+
+        /* Part 2 Range Slider */
+        .slider-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border: 1px solid #eee;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            flex: 2;
+            height: 8px;
+            background: #ccc;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 25px;
+            height: 25px;
+            background: #000;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        /* Part 3 Output Table */
+        .phase3-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 16px;
+        }
+        .phase3-table th, .phase3-table td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+        .phase3-table th { background-color: #000; color: #fff; text-transform: uppercase; }
+
+        /* =========================================
+           Part 4 Unified Export Board CSS
+           ========================================= */
+        #phase4ExportArea {
+            background: #fff;
+            padding: 20px 40px;
+            display: none;
+            margin-top: 20px;
+            border: none;
+        }
+
+        .export-branded-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #000;
+        }
+        .export-branded-title {
+            font-size: 28px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        /* Summary Bars Header */
+        .summary-header-row {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 30px;
+        }
+        .summary-block { flex: 1; }
+        .summary-title {
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        .stacked-bar-container {
+            display: flex;
+            width: 100%;
+            height: 35px;
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1);
+        }
+        .stacked-segment {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: bold;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: clip;
+            box-sizing: border-box;
+            transition: all 0.3s;
+        }
+
+        /* Dynamic Legend Below Summary Bars */
+        .summary-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 15px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-color { width: 14px; height: 14px; border-radius: 2px; }
+
+        /* Timeline Matrix */
+        .timeline-matrix {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 15px 0;
+            table-layout: fixed;
+        }
+        .timeline-matrix thead {
+            display: table-header-group;
+        }
+        .timeline-matrix th {
+            background: #f9f9f9;
+            border-top: 5px solid #000;
+            padding: 15px 10px 0;
+            vertical-align: bottom;
+        }
+        .timeline-matrix th .th-inner {
+            font-weight: bold;
+            text-transform: uppercase;
+            text-align: center;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 10px;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        .timeline-matrix td {
+            background: #f9f9f9;
+            padding: 0 10px 15px;
+            vertical-align: top;
+        }
+
+        /* Force explicit breaks between rows */
+        .timeline-matrix tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        /* Task Cards */
+        .task-card {
+            background: #fff;
+            border: 1px solid #eee;
+            border-left: 5px solid #000;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .task-cat {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+        .task-desc {
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 10px;
+            line-height: 1.2;
+        }
+        .task-contact {
+            background: #000;
+            color: #fff;
+            display: inline-block;
+            padding: 4px 8px;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        @media (max-width: 768px) {
+            .top-right-text { position: static; margin-bottom: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Main Header -->
+<header class="page-header">
+    <div class="top-right-text">Ryan Lester Work Plan</div>
+    <img src="/assets/strang_logo.png" alt="Company Logo" class="logo">
+</header>
+
+<!-- PART 1 -->
+<div class="panel">
+    <h2>Part 1: Time Allocation</h2>
+    <div class="controls">
+        <input type="text" id="labelInput" placeholder="Category (e.g., Pre-Production)">
+        <input type="number" id="valueInput" placeholder="Percentage (e.g., 20)">
+        <button onclick="addData()">Add Category</button>
+        <button onclick="clearData()" class="btn-clear">Clear</button>
+    </div>
+    <ul id="sliceList" class="slice-list"></ul>
+    <div class="chart-container"><canvas id="myPieChart"></canvas></div>
+    <button onclick="downloadChart1()" class="btn-download">Download Part 1 Chart as PNG</button>
+</div>
+
+<!-- PART 2 -->
+<div class="panel">
+    <h2>Part 2: Focus</h2>
+    <div class="slider-container">
+        <span>Architecture: <span id="archVal">60</span>%</span>
+        <input type="range" id="archSlider" min="0" max="100" value="60" oninput="updatePhase2Chart()">
+        <span>Interior Design: <span id="intVal">40</span>%</span>
+    </div>
+    <div class="chart-container"><canvas id="phase2Chart"></canvas></div>
+    <button onclick="downloadChart2()" class="btn-download">Download Part 2 Chart as PNG</button>
+</div>
+
+<!-- PART 3 -->
+<div class="panel">
+    <h2>Part 3: Deliverables and Timeline</h2>
+    <p class="subtitle">Assign tasks to timeframes to build your timeline data.</p>
+
+    <div class="planner-controls">
+        <select id="taskCategory">
+            <option value="Photography">Photography</option>
+            <option value="Videography">Videography</option>
+            <option value="Motion Graphics">Motion Graphics</option>
+            <option value="Mapping / GIS">Mapping / GIS</option>
+            <option value="Layout & Design">Layout and Design</option>
+        </select>
+        <input type="text" id="taskDesc" placeholder="Specific Task (e.g., Ocean Residence)">
+        <input type="text" id="taskContact" placeholder="Contact (e.g., Max)">
+        <select id="taskPriority">
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+        </select>
+        <select id="taskTiming">
+            <option value="" disabled selected>Select Timeline...</option>
+            <option value="Aug 1-15">Early August</option>
+            <option value="Aug 16-31">Late August</option>
+            <option value="Sep 1-15">Early September</option>
+            <option value="Sep 16-30">Late September</option>
+            <option value="Oct 1-15">Early October</option>
+            <option value="Oct 16-31">Late October</option>
+        </select>
+        <button onclick="addTask()">Add Task</button>
+    </div>
+
+    <table class="phase3-table" id="deliverablesTable">
+        <thead>
+        <tr>
+            <th>Category</th>
+            <th>Deliverable Description</th>
+            <th>Timing</th>
+            <th>Priority</th>
+            <th>Contact</th>
+            <th>Action</th>
+        </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+
+    <button onclick="exportProjectPlanCSV('Project_Plan_Aug_Nov.csv')" class="btn-download" style="background-color: #333;">
+        Download Plan as CSV (Excel)
+    </button>
+</div>
+
+<!-- PART 4: VISUAL TIMELINE & SUMMARY BOARD -->
+<div class="panel">
+    <h2>Part 4: Work Plan</h2>
+    <p class="subtitle">Generate PDF from Part 1, 2, and 3.</p>
+
+    <div class="planner-controls" style="margin-bottom: 30px;">
+        <label for="logoUploadInput" class="btn-upload" id="uploadLabel">1. Attach Logo for PDF</label>
+        <input type="file" id="logoUploadInput" accept="image/*" style="display: none;" onchange="handleLogoUpload(event)">
+
+        <!-- NEW: CSV Import Button -->
+        <label for="csvUploadInput" class="btn-upload btn-import" id="csvUploadLabel">2. Import Saved CSV</label>
+        <input type="file" id="csvUploadInput" accept=".csv" style="display: none;" onchange="handleCSVUpload(event)">
+
+        <button onclick="generateVisualTimeline()" style="margin: 0; flex: 1;">3. Generate / Refresh Board</button>
+    </div>
+
+    <!-- The Master Export Container -->
+    <div id="phase4ExportArea">
+
+        <div class="export-branded-header">
+            <!-- Export Logo Container -->
+            <div id="exportLogoContainer">
+                <div style="width: 250px; height: 60px; background: #f4f4f4; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; color: #888; font-weight: bold; font-size: 14px;">[ LOGO WILL APPEAR HERE ]</div>
+            </div>
+            <div class="export-branded-title">Ryan Lester Work Plan</div>
+        </div>
+
+        <!-- Summary Bars & Legends -->
+        <div id="summaryBarsWrapper" class="summary-header-row"></div>
+
+        <!-- Timeline Matrix Grid -->
+        <div id="timelineGrid"></div>
+
+    </div>
+
+    <button id="downloadTimelineBtn" onclick="downloadTimelinePDF()" class="btn-download" style="background-color: #333; display: none;">
+        Download Complete Board as 17x11 PDF
+    </button>
+</div>
+
+<script>
+    // --- 1. Data URL Image Uploader ---
+    function handleLogoUpload(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64Image = e.target.result;
+                document.getElementById('exportLogoContainer').innerHTML = `<img src="${base64Image}" alt="Uploaded Logo" style="width: 250px; height: auto;">`;
+
+                const btn = document.getElementById('uploadLabel');
+                btn.textContent = '✓ Logo Attached';
+                btn.style.background = '#28a745';
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    // --- 2. CSV Uploader and Parser ---
+    function handleCSVUpload(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                parseCSVToTable(text);
+
+                const btn = document.getElementById('csvUploadLabel');
+                btn.textContent = '✓ CSV Loaded';
+                btn.style.background = '#28a745';
+
+                // Auto-generate the board based on the new data
+                generateVisualTimeline();
+            };
+            reader.readAsText(file);
+        }
+        // Reset input so the same file can be uploaded again if needed
+        event.target.value = '';
+    }
+
+    function parseCSVToTable(csvText) {
+        // Split into lines, ignoring empty ones
+        const lines = csvText.split('\n').filter(line => line.trim() !== '');
+
+        // The first two lines are our headers in the custom export format, so we skip them
+        if (lines.length <= 2) return;
+
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = ''; // Clear current table
+
+        for (let i = 2; i < lines.length; i++) {
+            // Parse CSV line using regex to handle potential commas inside quoted strings
+            const row = lines[i];
+            const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(col => col.replace(/^"|"$/g, '').replace(/""/g, '"'));
+
+            // Ensure the row has the baseline columns we expect (Cat, Desc, Prio, Contact, Timing)
+            if (cols.length >= 5) {
+                const cat = cols[0];
+                const desc = cols[1];
+                const prio = cols[2];
+                const contact = cols[3];
+                const timing = cols[4];
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                        <td>${cat}</td>
+                        <td>${desc}</td>
+                        <td>${timing}</td>
+                        <td>${prio}</td>
+                        <td>${contact}</td>
+                        <td><button class="btn-delete" onclick="this.parentNode.parentNode.remove()">Remove</button></td>
+                    `;
+                tbody.appendChild(tr);
+            }
+        }
+    }
+
+    // --- Chart Configurations ---
+    Chart.defaults.font.family = "'DIN Pro Condensed', 'DIN Condensed', 'Arial Narrow', sans-serif";
+    Chart.register(ChartDataLabels);
+
+    const grayPalette = ['#000000', '#333333', '#666666', '#999999', '#CCCCCC', '#1A1A1A', '#4D4D4D', '#808080', '#B3B3B3', '#E6E6E6'];
+
+    const whiteBackgroundPlugin = {
+        id: 'customCanvasBackgroundColor',
+        beforeDraw: (chart, args, options) => {
+            const {ctx} = chart;
+            ctx.save();
+            ctx.globalCompositeOperation = 'destination-over';
+            ctx.fillStyle = options.color || '#ffffff';
+            ctx.fillRect(0, 0, chart.width, chart.height);
+            ctx.restore();
+        }
+    };
+
+    // PART 1
+    const ctx1 = document.getElementById('myPieChart').getContext('2d');
+    let myPieChart = new Chart(ctx1, {
+        type: 'pie',
+        data: {
+            labels: ['Pre-Production', 'Field Capture', 'Post-Production'],
+            datasets: [{ data: [20, 40, 40], backgroundColor: grayPalette, borderColor: '#ffffff', borderWidth: 2 }]
+        },
+        options: {
+            responsive: true,
+            devicePixelRatio: 4,
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { size: 16 } } },
+                customCanvasBackgroundColor: { color: 'white' },
+                datalabels: {
+                    color: '#ffffff', backgroundColor: 'rgba(0, 0, 0, 0.7)', borderRadius: 2, padding: 6,
+                    font: { weight: 'bold', size: 16 },
+                    formatter: (value, context) => {
+                        const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                        return total === 0 ? '0%' : ((value / total) * 100).toFixed(1).replace('.0', '') + '%';
+                    }
+                }
+            }
+        },
+        plugins: [whiteBackgroundPlugin]
+    });
+
+    function renderList() {
+        const listContainer = document.getElementById('sliceList');
+        listContainer.innerHTML = '';
+        const labels = myPieChart.data.labels;
+        const data = myPieChart.data.datasets[0].data;
+        const colors = myPieChart.data.datasets[0].backgroundColor;
+
+        for (let i = 0; i < labels.length; i++) {
+            const li = document.createElement('li');
+            li.className = 'slice-item';
+            li.style.borderLeftColor = colors[i % colors.length];
+            li.innerHTML = `<span class="slice-info">${labels[i]} — ${data[i]}%</span>
+                                <button class="btn-delete" onclick="deleteSlice(${i})">Remove</button>`;
+            listContainer.appendChild(li);
+        }
+    }
+
+    function deleteSlice(i) {
+        myPieChart.data.labels.splice(i, 1);
+        myPieChart.data.datasets[0].data.splice(i, 1);
+        myPieChart.update();
+        renderList();
+    }
+
+    function addData() {
+        const label = document.getElementById('labelInput').value.trim();
+        const value = parseFloat(document.getElementById('valueInput').value);
+        if (label && !isNaN(value) && value > 0) {
+            if (myPieChart.data.labels[0] === 'Pre-Production' && myPieChart.data.labels.length === 3) {
+                myPieChart.data.labels = []; myPieChart.data.datasets[0].data = [];
+            }
+            myPieChart.data.labels.push(label);
+            myPieChart.data.datasets[0].data.push(value);
+            myPieChart.update(); renderList();
+            document.getElementById('labelInput').value = '';
+            document.getElementById('valueInput').value = '';
+        }
+    }
+    function clearData() { myPieChart.data.labels = []; myPieChart.data.datasets[0].data = []; myPieChart.update(); renderList(); }
+    function downloadChart1() { const l = document.createElement('a'); l.download = 'part1-chart.png'; l.href = document.getElementById('myPieChart').toDataURL('image/png', 1.0); l.click(); }
+
+    // PART 2
+    const ctx2 = document.getElementById('phase2Chart').getContext('2d');
+    let phase2Chart = new Chart(ctx2, {
+        type: 'doughnut',
+        data: { labels: ['Architecture', 'Interior Design'], datasets: [{ data: [60, 40], backgroundColor: ['#000000', '#999999'], borderColor: '#ffffff', borderWidth: 2 }] },
+        options: {
+            responsive: true, cutout: '60%',
+            devicePixelRatio: 4,
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { size: 16 } } },
+                customCanvasBackgroundColor: { color: 'white' },
+                datalabels: { color: '#ffffff', backgroundColor: 'rgba(0, 0, 0, 0.7)', borderRadius: 2, padding: 6, font: { weight: 'bold', size: 16 }, formatter: v => v + '%' }
+            }
+        }, plugins: [whiteBackgroundPlugin]
+    });
+
+    function updatePhase2Chart() {
+        const archVal = parseInt(document.getElementById('archSlider').value);
+        document.getElementById('archVal').textContent = archVal;
+        document.getElementById('intVal').textContent = 100 - archVal;
+        phase2Chart.data.datasets[0].data = [archVal, 100 - archVal];
+        phase2Chart.update();
+    }
+    function downloadChart2() { const l = document.createElement('a'); l.download = 'part2-chart.png'; l.href = document.getElementById('phase2Chart').toDataURL('image/png', 1.0); l.click(); }
+
+    // PART 3
+    function addTask() {
+        const cat = document.getElementById('taskCategory').value;
+        const desc = document.getElementById('taskDesc').value.trim();
+        const timing = document.getElementById('taskTiming').value;
+        const prio = document.getElementById('taskPriority').value;
+        const contact = document.getElementById('taskContact').value.trim();
+
+        if (desc && timing && contact) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${cat}</td><td>${desc}</td><td>${timing}</td><td>${prio}</td><td>${contact}</td><td><button class="btn-delete" onclick="this.parentNode.parentNode.remove()">Remove</button></td>`;
+            document.getElementById('tableBody').appendChild(tr);
+            document.getElementById('taskDesc').value = ''; document.getElementById('taskContact').value = ''; document.getElementById('taskTiming').selectedIndex = 0;
+        }
+    }
+
+    function exportProjectPlanCSV(filename) {
+        const rows = document.querySelectorAll('#tableBody tr');
+        if (!rows.length) return alert("Add a task first.");
+        let csv = ['"PROJECT PLAN: AUGUST 1 - NOVEMBER 1"','"Category","Deliverable Description","Priority","Contact","Timeline Selection","Aug 1-15","Aug 16-31","Sep 1-15","Sep 16-30","Oct 1-15","Oct 16-31"'];
+        const colsRef = ["Aug 1-15", "Aug 16-31", "Sep 1-15", "Sep 16-30", "Oct 1-15", "Oct 16-31"];
+
+        rows.forEach(row => {
+            let d = Array.from(row.querySelectorAll('td')).map(td => td.innerText.replace(/"/g, '""'));
+            let [cat, desc, timing, prio, contact] = d;
+            let r = [`"${cat}"`, `"${desc}"`, `"${prio}"`, `"${contact}"`, `"${timing}"`];
+            colsRef.forEach(t => r.push(timing === t ? `"[ ${contact} ]"` : '""'));
+            csv.push(r.join(','));
+        });
+
+        const l = document.createElement('a'); l.download = filename; l.href = window.URL.createObjectURL(new Blob([csv.join('\n')], {type: 'text/csv'})); l.click();
+    }
+
+    // PART 4
+    function generateVisualTimeline() {
+        const exportArea = document.getElementById('phase4ExportArea');
+        const summaryWrapper = document.getElementById('summaryBarsWrapper');
+        const gridWrapper = document.getElementById('timelineGrid');
+        const rows = document.querySelectorAll('#tableBody tr');
+
+        if (rows.length === 0) {
+            alert("Please add at least one task in Part 3 before generating the board.");
+            return;
+        }
+
+        exportArea.style.display = 'block';
+        document.getElementById('downloadTimelineBtn').style.display = 'block';
+
+        summaryWrapper.innerHTML = '';
+
+        // Part 1 Data
+        const p1Labels = myPieChart.data.labels;
+        const p1Data = myPieChart.data.datasets[0].data;
+        const p1Colors = myPieChart.data.datasets[0].backgroundColor;
+        const p1Total = p1Data.reduce((a, b) => a + b, 0);
+
+        let phase1Html = `<div class="summary-block">
+                <div class="summary-title">Part 1: Time Allocation</div>
+                <div class="stacked-bar-container">`;
+        let phase1Legend = `<div class="summary-legend">`;
+
+        for (let i = 0; i < p1Labels.length; i++) {
+            if (p1Data[i] > 0) {
+                const pct = parseFloat(((p1Data[i] / p1Total) * 100).toFixed(1));
+                const color = p1Colors[i % p1Colors.length];
+                const displayHtml = pct >= 5 ? `${pct}%` : '';
+
+                phase1Html += `<div class="stacked-segment" style="width: ${pct}%; background-color: ${color};" title="${p1Labels[i]} (${pct}%)">${displayHtml}</div>`;
+                phase1Legend += `<div class="legend-item"><div class="legend-color" style="background-color: ${color};"></div>${p1Labels[i]} (${pct}%)</div>`;
+            }
+        }
+        phase1Html += `</div>${phase1Legend}</div></div>`;
+
+        // Part 2 Data
+        const archVal = parseInt(document.getElementById('archSlider').value);
+        const intVal = 100 - archVal;
+
+        let phase2Html = `<div class="summary-block">
+                <div class="summary-title">Part 2: Focus</div>
+                <div class="stacked-bar-container">`;
+        let phase2Legend = `<div class="summary-legend">`;
+
+        if (archVal > 0) {
+            phase2Html += `<div class="stacked-segment" style="width: ${archVal}%; background-color: #000000;" title="Architecture (${archVal}%)">${archVal >= 5 ? archVal + '%' : ''}</div>`;
+            phase2Legend += `<div class="legend-item"><div class="legend-color" style="background-color: #000000;"></div>Architecture (${archVal}%)</div>`;
+        }
+        if (intVal > 0) {
+            phase2Html += `<div class="stacked-segment" style="width: ${intVal}%; background-color: #999999; color: #ffffff;" title="Interior Design (${intVal}%)">${intVal >= 5 ? intVal + '%' : ''}</div>`;
+            phase2Legend += `<div class="legend-item"><div class="legend-color" style="background-color: #999999;"></div>Interior Design (${intVal}%)</div>`;
+        }
+        phase2Html += `</div>${phase2Legend}</div></div>`;
+
+        summaryWrapper.innerHTML = phase1Html + phase2Html;
+
+        // Mathematical Timeline Matrix
+        const timeWindows = ["Aug 1-15", "Aug 16-31", "Sep 1-15", "Sep 16-30", "Oct 1-15", "Oct 16-31"];
+        const colData = timeWindows.map(() => []);
+
+        rows.forEach(row => {
+            const cols = row.querySelectorAll('td');
+            const timing = cols[2].innerText;
+            const colIndex = timeWindows.indexOf(timing);
+            if (colIndex !== -1) {
+                colData[colIndex].push({
+                    cat: cols[0].innerText,
+                    desc: cols[1].innerText,
+                    prio: cols[3].innerText,
+                    contact: cols[4].innerText
+                });
+            }
+        });
+
+        const maxTasks = Math.max(...colData.map(col => col.length));
+
+        let matrixHtml = `<table class="timeline-matrix"><thead><tr>`;
+        timeWindows.forEach(tw => {
+            matrixHtml += `<th><div class="th-inner">${tw}</div></th>`;
+        });
+        matrixHtml += `</tr></thead><tbody>`;
+
+        if (maxTasks === 0) {
+            matrixHtml += `<tr><td colspan="6" style="text-align:center; padding: 20px;">No tasks mapped to timelines.</td></tr>`;
+        } else {
+            for (let i = 0; i < maxTasks; i++) {
+                matrixHtml += `<tr>`;
+                for (let j = 0; j < timeWindows.length; j++) {
+                    matrixHtml += `<td>`;
+                    const task = colData[j][i];
+                    if (task) {
+                        let borderCol = '#cccccc';
+                        if (task.prio === 'High') borderCol = '#000000';
+                        if (task.prio === 'Medium') borderCol = '#777777';
+
+                        matrixHtml += `
+                                <div class="task-card" style="border-left-color: ${borderCol}">
+                                    <div class="task-cat">${task.cat}</div>
+                                    <div class="task-desc">${task.desc}</div>
+                                    <div class="task-contact">${task.contact}</div>
+                                </div>
+                            `;
+                    }
+                    matrixHtml += `</td>`;
+                }
+                matrixHtml += `</tr>`;
+            }
+        }
+
+        matrixHtml += `<tr><td colspan="6" style="padding: 10px; background: transparent;"></td></tr>`;
+        matrixHtml += `</tbody></table>`;
+
+        gridWrapper.innerHTML = matrixHtml;
+    }
+
+    function downloadTimelinePDF() {
+        window.scrollTo(0, 0);
+
+        const element = document.getElementById('phase4ExportArea');
+
+        const opt = {
+            margin:       0.5,
+            filename:     'Executive_Project_Plan.pdf',
+            image:        { type: 'jpeg', quality: 1.0 },
+            html2canvas:  { scale: 4, useCORS: true, scrollY: 0 },
+            jsPDF:        { unit: 'in', format: 'tabloid', orientation: 'landscape' },
+            pagebreak:    { mode: ['css', 'legacy'], avoid: ['tr', '.task-card'] }
+        };
+
+        html2pdf().set(opt).from(element).save();
+    }
+
+    renderList();
+</script>
+</body>
+</html>
